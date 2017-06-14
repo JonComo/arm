@@ -13,6 +13,7 @@ document.body.appendChild(canvas);
 ctx.fillStyle = "#ff0000";
 ctx.lineWidth = 10;
 ctx.font = "40px Arial";
+ctx.lineJoin = "round";
 
 
 function rand_normal() {
@@ -59,17 +60,19 @@ function features(target) {
 
 function arm(angles) {
     let s = {x: width/2, y: height/2};
-    let l = 200;
 
     ctx.beginPath();
 
     ctx.moveTo(s.x, s.y);
     for (let i = 0; i < angles.length; i++) {
-        s = {x: s.x + Math.cos(angles[i])*l, y: s.y + Math.sin(angles[i])*l};
+        s = {x: s.x + Math.cos(angles[i])*length, y: s.y + Math.sin(angles[i])*length};
         ctx.lineTo(s.x, s.y);
     }
 
     ctx.stroke();
+
+    ctx.fillStyle = "#0000ff";
+    ctx.fillRect(s.x-20, s.y-20, 40, 40);
 
     return s;
 }
@@ -130,7 +133,10 @@ init_weights();
 let avg_r = 0;
 let learning_rate = 0.005;
 let variance = .1;
+
+// arm
 var segments = 4;
+var length = 200;
 
 var training = false;
 
