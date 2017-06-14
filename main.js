@@ -47,12 +47,13 @@ function randn_var(rows, cols, variance) {
 }
 
 function init_weights() {
-    W = randn_var(DIM, DIM, .5);
+    W = randn_var(DIM, DIM, .1);
 }
 
 function features(target) {
     let s = {x: width/2, y: height/2};
     let vect = {x: s.x - target.x, y: s.y - target.y};
+    //let angle = Math.atan2(vect.y, vect.x);
     return [1, vect.x/500, vect.y/500];
 }
 
@@ -82,17 +83,18 @@ function distance(a, b) {
 function get_angles(f, W, l) {
     let z = math.zeros(DIM);
 
-    for (let i = 0; i < f.length; i ++) {
-        z._data[i] = f[i];
+    for (let i = 0; i < DIM; i ++) {
+        if (i < f.length) {
+            z._data[i] = f[i];
+        } else {
+            z._data[i] = 1;
+        }
     }
 
     z = math.multiply(z, W);
-    z = math.map(z, Math.tanh);
-    z[0] = 1;
-
-    z = math.multiply(z, W);
-    z = math.map(z, Math.tanh);
-    z[0] = 1;
+    for (let i = 0; i < f.length; i ++) {
+        z._data[i] += f[i];
+    }
 
     z = math.multiply(z, W);
 
@@ -121,7 +123,7 @@ window.onkeydown = function(evt) {
 
 var mouse = {x: 0, y: 0};
 
-let DIM = features(mouse).length + 10;
+let DIM = features(mouse).length + 4;
 var W;
 init_weights();
 
@@ -141,12 +143,12 @@ function render() {
         ctx.save();
         ctx.globalAlpha = .02;
 
-        let samples = 500;
+        let samples = 1000;
         let rs = new Array(samples);
         let candidates = [];
         for (let i = 0; i < samples; i ++) {
             let targ_angle = Math.random() * Math.PI * 2;
-            let d = Math.random() * 500;
+            let d = 400 + Math.random() * 400;
             let target = {x: width/2 + Math.cos(targ_angle) * d, y: height/2 + Math.sin(targ_angle) * d};
 
             ctx.fillRect(target.x-10, target.y-10, 20, 20);
@@ -176,6 +178,8 @@ function render() {
         let std = math.std(rs);
 
         avg_r += (mean - avg_r) * .01;
+
+        W = math.add(W, randn_var(DIM, DIM, .0001));
 
         for (let i = 0; i < samples; i ++) {
             let update = math.multiply( learning_rate * (rs[i]-mean)/std, candidates[i] );
