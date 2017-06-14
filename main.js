@@ -53,8 +53,7 @@ function init_weights() {
 function features(target) {
     let s = {x: width/2, y: height/2};
     let vect = {x: s.x - target.x, y: s.y - target.y};
-    let norm = Math.sqrt(vect.x*vect.x + vect.y*vect.y);
-    return [1, vect.x/norm, vect.y/norm];
+    return [1, vect.x/500, vect.y/500];
 }
 
 function arm(angles) {
@@ -89,9 +88,11 @@ function get_angles(f, W, l) {
 
     z = math.multiply(z, W);
     z = math.map(z, Math.tanh);
+    z[0] = 1;
 
     z = math.multiply(z, W);
     z = math.map(z, Math.tanh);
+    z[0] = 1;
 
     z = math.multiply(z, W);
 
@@ -120,13 +121,14 @@ window.onkeydown = function(evt) {
 
 var mouse = {x: 0, y: 0};
 
-let DIM = features(mouse).length + 4;
+let DIM = features(mouse).length + 10;
 var W;
 init_weights();
 
 let avg_r = 0;
-let learning_rate = 0.002;
+let learning_rate = 0.005;
 let variance = .1;
+var segments = 4;
 
 var training = false;
 
@@ -136,27 +138,29 @@ function render() {
     ctx.lineWidth = 10;
 
     if (training) {
+        ctx.save();
+        ctx.globalAlpha = .02;
 
-        ctx.globalAlpha = .05;
-
-        let samples = 100;
+        let samples = 500;
         let rs = new Array(samples);
         let candidates = [];
         for (let i = 0; i < samples; i ++) {
-            let targ_angle = Math.random() * Math.PI;
-            let d = Math.min(width, height)/2;
+            let targ_angle = Math.random() * Math.PI * 2;
+            let d = Math.random() * 500;
             let target = {x: width/2 + Math.cos(targ_angle) * d, y: height/2 + Math.sin(targ_angle) * d};
 
             ctx.fillRect(target.x-10, target.y-10, 20, 20);
 
             let f = features(target);
 
-            let angles = get_angles(f, W, 2);
+            let angles = get_angles(f, W, segments);
+            ctx.strokeStyle = "#000000";
             let p1 = arm(angles);
 
             let W_noise = randn_var(DIM, DIM, variance);
             let W_mod = math.add(W, W_noise);
-            angles = get_angles(f, W_mod, 2);
+            angles = get_angles(f, W_mod, segments);
+            ctx.strokeStyle = "#ff0000";
             let p2 = arm(angles);
 
             let dist1 = distance(p1, target);
@@ -178,6 +182,7 @@ function render() {
             W = math.add(W, update);
         }
 
+        /*
         ctx.globalAlpha = 1;
 
         rs.sort(function(a,b) {
@@ -200,15 +205,15 @@ function render() {
                 ctx.lineTo(i * width/rs.length, yoff-r);
             }
         }
-        ctx.stroke();
+        ctx.stroke(); 
 
-        ctx.fillText("average reward: " + Math.round(avg_r*100)/100, 10, 40);
-        
+        ctx.fillText("average reward: " + Math.round(avg_r*100)/100, 10, 40); */
+        ctx.restore();
     } else {
         ctx.globalAlpha = 1;
 
         let f = features(mouse);
-        let angles = get_angles(f, W, 2);
+        let angles = get_angles(f, W, segments);
         let p = arm(angles);
     }
 }
