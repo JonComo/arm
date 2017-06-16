@@ -39,16 +39,16 @@ function randn(rows, cols) {
     return z;
 }
 
-function randn_var(rows, cols, variance) {
+function randn_sigma(rows, cols, sigma) {
     let z = math.zeros([rows, cols]);
     z = math.map(z, function() {
-        return rand_normal() * variance;
+        return rand_normal() * sigma;
     });
     return z;
 }
 
 function init_weights() {
-    W = randn_var(DIM, DIM, .1);
+    W = randn_sigma(DIM, DIM, .1);
 }
 
 function features(target) {
@@ -56,34 +56,9 @@ function features(target) {
     let vect = {x: s.x - target.x, y: s.y - target.y};
     //let angle = Math.atan2(vect.y, vect.x);
     return [1, vect.x/500, vect.y/500];
-}
+}   
 
-function arm(angles) {
-    let s = {x: width/2, y: height/2};
-
-    ctx.beginPath();
-
-    ctx.moveTo(s.x, s.y);
-    for (let i = 0; i < angles.length; i++) {
-        s = {x: s.x + Math.cos(angles[i])*length, y: s.y + Math.sin(angles[i])*length};
-        ctx.lineTo(s.x, s.y);
-    }
-
-    ctx.stroke();
-
-    ctx.fillStyle = "#0000ff";
-    ctx.fillRect(s.x-20, s.y-20, 40, 40);
-
-    return s;
-}
-
-function distance(a, b) {
-    let xd = a.x - b.x;
-    let yd = a.y - b.y;
-    return Math.sqrt(xd*xd + yd*yd);
-}
-
-function get_angles(f, W, l) {
+function feed_forward(f, W, l) {
     let z = math.zeros(DIM);
 
     for (let i = 0; i < DIM; i ++) {
@@ -95,18 +70,50 @@ function get_angles(f, W, l) {
     }
 
     z = math.multiply(z, W);
-    for (let i = 0; i < f.length; i ++) {
-        z._data[i] += f[i];
-    }
+    z = math.map(z, Math.tanh);
+    z._data[0] = 1;
+
+    z = math.multiply(z, W);
+    z = math.map(z, Math.tanh);
+    z._data[0] = 1;
 
     z = math.multiply(z, W);
 
+    /*
+    let s = {x: width/2 + z._data[0]*100, y: height/2 + z._data[1]*100};
+    */
+
+    // draw arm
+
     let r = math.zeros(l);
     for (let i = 0; i < l; i ++) {
-        r._data[i] = z._data[i];
+        r._data[i] = z._data[i] * 2 * Math.PI;
     }
 
-    return r._data;
+    let angles = r._data;
+
+    let s = {x: width/2, y: height/2};
+
+    ctx.beginPath();
+
+    ctx.moveTo(s.x, s.y);
+    for (let i = 0; i < angles.length; i++) {
+        s = {x: s.x + Math.cos(angles[i])*length, y: s.y + Math.sin(angles[i])*length};
+        ctx.lineTo(s.x, s.y);
+    }
+
+    ctx.stroke();
+    
+
+
+    ctx.fillRect(s.x-20, s.y-20, 40, 40);
+    return s;
+}
+
+function distance_2(a, b) {
+    let xd = a.x - b.x;
+    let yd = a.y - b.y;
+    return xd*xd + yd*yd;
 }
 
 window.onmousemove = function(evt) {
@@ -131,14 +138,18 @@ var W;
 init_weights();
 
 let avg_r = 0;
-let learning_rate = 0.005;
-let variance = .1;
+let learning_rate = .2;
+let sigma = .02;
+
+var samples = 1000;
+var rs = new Array(samples);
 
 // arm
-var segments = 4;
+var segments = 5;
 var length = 200;
 
 var training = false;
+
 
 function render() {
     window.requestAnimationFrame(render);
@@ -148,33 +159,32 @@ function render() {
     if (training) {
         ctx.save();
         ctx.globalAlpha = .02;
-
-        let samples = 1000;
-        let rs = new Array(samples);
+        
         let candidates = [];
         for (let i = 0; i < samples; i ++) {
             let targ_angle = Math.random() * Math.PI * 2;
-            let d = 400 + Math.random() * 400;
+            let d = Math.random() * 800;
             let target = {x: width/2 + Math.cos(targ_angle) * d, y: height/2 + Math.sin(targ_angle) * d};
 
+            ctx.fillStyle = "#000000";
             ctx.fillRect(target.x-10, target.y-10, 20, 20);
 
             let f = features(target);
 
-            let angles = get_angles(f, W, segments);
-            ctx.strokeStyle = "#000000";
-            let p1 = arm(angles);
+            // arm from weights
+            ctx.fillStyle = "#0000ff";
+            let p1 = feed_forward(f, W, segments);
 
-            let W_noise = randn_var(DIM, DIM, variance);
+            // arm from modified weights
+            let W_noise = randn_sigma(DIM, DIM, sigma);
             let W_mod = math.add(W, W_noise);
-            angles = get_angles(f, W_mod, segments);
-            ctx.strokeStyle = "#ff0000";
-            let p2 = arm(angles);
+            ctx.fillStyle = "#ff0000";
+            let p2 = feed_forward(f, W_mod, segments);
 
-            let dist1 = distance(p1, target);
-            let dist2 = distance(p2, target);
+            let r1 = -distance_2(p1, target);
+            let r2 = -distance_2(p2, target);
 
-            let r = dist1 - dist2;
+            let r = r2 - r1;
             rs[i] = r;
 
             candidates.push(W_noise);
@@ -185,46 +195,21 @@ function render() {
 
         avg_r += (mean - avg_r) * .01;
 
-        W = math.add(W, randn_var(DIM, DIM, .0001));
+        let weighted_avg = math.zeros([DIM, DIM]);
 
         for (let i = 0; i < samples; i ++) {
-            let update = math.multiply( learning_rate * (rs[i]-mean)/std, candidates[i] );
-            W = math.add(W, update);
+            let u = math.multiply(  (rs[i]-mean)/std, candidates[i] );
+            weighted_avg = math.add(weighted_avg, u)
         }
 
-        /*
-        ctx.globalAlpha = 1;
-
-        rs.sort(function(a,b) {
-            return a - b;
-        });
-
-        let yoff = height/2;
-        ctx.beginPath();
-        ctx.moveTo(0, yoff);
-        ctx.lineTo(width, yoff);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.lineWidth = 1;
-        for (let i = 0; i < rs.length; i ++) {
-            let r = rs[i];
-            if (i == 0) {
-                ctx.moveTo(0, yoff-r);
-            } else {
-                ctx.lineTo(i * width/rs.length, yoff-r);
-            }
-        }
-        ctx.stroke(); 
-
-        ctx.fillText("average reward: " + Math.round(avg_r*100)/100, 10, 40); */
+        W = math.add(W, math.multiply(learning_rate/(samples*sigma), weighted_avg));
         ctx.restore();
     } else {
         ctx.globalAlpha = 1;
 
         let f = features(mouse);
-        let angles = get_angles(f, W, segments);
-        let p = arm(angles);
+        ctx.fillStyle = "#0000ff";
+        let p = feed_forward(f, W, segments);
     }
 }
 
