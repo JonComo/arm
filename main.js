@@ -213,4 +213,10 @@ function render() {
     }
 }
 
+function toggleTraining() {
+    let selector = 'toggleTraining';
+
+    training = !training;
+    document.getElementById(selector).innerHTML = training ? 'Stop' : 'Train';
+}
 render();
