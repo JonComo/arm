@@ -131,6 +131,13 @@ window.onkeydown = function(evt) {
     }
 }
 
+function toggleTraining() {
+    let selector = 'toggleTraining';
+
+    training = !training;
+    document.getElementById(selector).innerHTML = training ? 'Stop' : 'Train';
+}
+
 var mouse = {x: 0, y: 0};
 
 let DIM = features(mouse).length + 4;
@@ -213,10 +220,4 @@ function render() {
     }
 }
 
-function toggleTraining() {
-    let selector = 'toggleTraining';
-
-    training = !training;
-    document.getElementById(selector).innerHTML = training ? 'Stop' : 'Train';
-}
 render();
